@@ -10,7 +10,7 @@ pygame.init()
 screen_width = 800
 screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Tamagotchi modoki")
+pygame.display.set_caption("た●ごっちもどき")
 
 # 背景の色設定 (RGB)
 BACKGROUND_COLOR = (255, 249, 172)
@@ -25,6 +25,7 @@ normal_character_path = os.path.join(assets_dir, "toya.png")
 sad_character_path = os.path.join(assets_dir, "toya_bad.png")
 happy_character_path = os.path.join(assets_dir, "toyaluv.png")
 tombstone_path = os.path.join(assets_dir, "tombstone.png")
+fukidashi_path = os.path.join(assets_dir, "fukidashi.png")
 
 # フォントファイルのパスを指定
 FONT_PATH = os.path.join("assets.gitignore", "YokohamaDotsJPN.otf")
@@ -50,6 +51,7 @@ normal_character = pygame.image.load(normal_character_path)
 sad_character = pygame.image.load(sad_character_path)
 happy_character = pygame.image.load(happy_character_path)
 tombstone_image = pygame.image.load(tombstone_path)
+fukidashi_image = pygame.image.load(fukidashi_path)
 normal_character = pygame.transform.scale(
     normal_character, (200, 200))  # キャラクター画像をリサイズ
 sad_character = pygame.transform.scale(
@@ -58,6 +60,8 @@ happy_character = pygame.transform.scale(
     happy_character, (200, 200))  # キャラクター画像をリサイズ
 tombstone_image = pygame.transform.scale(
     tombstone_image, (200, 200))
+fukidashi_image = pygame.transform.scale(
+    fukidashi_image, (250, 250))
 
 # デバウンスに必要な変数を追加
 last_click_time = 0  # 最後のクリック時間
@@ -74,6 +78,11 @@ hunger = 50
 happiness = 50
 energy = 50
 
+# ステータスの累計値の初期設定
+total_energy = 0
+total_hunger = 0
+total_happiness = 0
+
 # ボタンの位置
 hunger_x = screen_width // 4 - button_width // 2
 happiness_x = screen_width // 2 - button_width // 2
@@ -88,6 +97,7 @@ energy_button_rect = pygame.Rect(
 
 # メインループ
 game_over = False
+happy_end = False
 while True:
   for event in pygame.event.get():
     if event.type == pygame.QUIT:
@@ -102,6 +112,15 @@ while True:
     happiness = max(happiness - 0.002, 0)  # 幸福度
     hunger = max(hunger - 0.002, 0)        # 空腹度
     energy = max(energy - 0.002, 0)        # エネルギー
+
+# ハッピーエンドに移行可能かどうかをチェック
+    def can_transition_to_happy_end():
+      return (total_energy >= 100 and
+              total_hunger >= 100 and
+              total_happiness >= 100 and
+              energy > 20 and
+              hunger > 20 and
+              happiness > 20)
 
 # ゲームオーバーのチェック
     if happiness == 0 and hunger == 0 and energy == 0:
@@ -158,10 +177,13 @@ while True:
           last_click_time = current_time  # クリック時間を更新
           if hunger_button_rect.collidepoint(mouse_pos):
             hunger += 10  # おなかを増加
+            total_hunger += 10
           elif happiness_button_rect.collidepoint(mouse_pos):
             happiness += 10  # しあわせを増加
+            total_happiness += 10
           elif energy_button_rect.collidepoint(mouse_pos):
             energy += 10  # げんきを増加
+            total_energy += 10
 
     # ボタンの描画
     for button_rect, label in [(hunger_button_rect, "ごはん"),
@@ -177,6 +199,27 @@ while True:
       button_text = button_font.render(label, True, (255, 255, 255))
       text_rect = button_text.get_rect(center=button_rect.center)
       screen.blit(button_text, text_rect)
+
+     # ハッピーエンドボタンの描画
+    button_rect = pygame.Rect(screen_width // 2 - 75,
+                              screen_height // 2 + 220, 150, 50)
+    if can_transition_to_happy_end():
+      pygame.draw.rect(screen, (0, 0, 0), button_rect)
+      # マウス位置でボタンの色を変更
+      if button_rect.collidepoint(pygame.mouse.get_pos()):
+        pygame.draw.rect(screen, button_hover_color, button_rect)
+      else:
+        pygame.draw.rect(screen, button_color, button_rect)
+
+      button_text = font.render("ひとりだち", True, (255, 255, 255))
+      screen.blit(button_text, (button_rect.x + 20, button_rect.y + 10))
+      # ハッピーエンドのボタンを押す
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # 左クリック　
+      mouse_x, mouse_y = event.pos  # 現在のマウスの位置を取得
+      button_rect = pygame.Rect(screen_width // 2 - 75, screen_height //
+                                2 + 220, 150, 50)  # ボタンの位置とサイズ
+      if button_rect.collidepoint(mouse_x, mouse_y) and can_transition_to_happy_end():
+        happy_end = True
 
   else:
     screen.fill(BACKGROUND_COLOR2)
@@ -197,7 +240,38 @@ while True:
       happiness = 50
       hunger = 50
       energy = 50
+      total_happiness = 0
+      total_hunger = 0
+      total_energy = 0
       game_over = False
+    elif keys[pygame.K_n]:  # 'N'キーで終了
+      pygame.quit()
+      sys.exit()
+
+  if happy_end:
+    screen.fill(BACKGROUND_COLOR)
+    character_image = happy_character
+    character_x = screen_width // 2 - character_image.get_width() // 2
+    character_y = screen_height // 2 - character_image.get_height() // 2
+    screen.blit(character_image, (character_x, character_y))
+    fukidashi_x = screen_width // 2 - fukidashi_image.get_width() // 2
+    fukidashi_y = -20
+    screen.blit(fukidashi_image, (fukidashi_x, fukidashi_y))
+    message_text = font.render("いままで ありがとう", True, (0, 0, 0))
+    screen.blit(message_text, (screen_width // 2 -
+                               message_text.get_width() // 2, screen_height // 2 - character_image.get_height()))
+    restart_text = font.render("もう一度遊びますか？(Y/N)", True, (0, 0, 0))
+    screen.blit(restart_text, (screen_width // 2 -
+                               restart_text.get_width() // 2, screen_height // 2 + 130))
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_y]:  # 'Y'キーで再スタート
+      happiness = 50
+      hunger = 50
+      energy = 50
+      total_happiness = 0
+      total_hunger = 0
+      total_energy = 0
+      happy_end = False
     elif keys[pygame.K_n]:  # 'N'キーで終了
       pygame.quit()
       sys.exit()
